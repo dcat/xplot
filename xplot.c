@@ -6,20 +6,6 @@ static xcb_connection_t *conn;
 static xcb_screen_t *scr;
 static uint32_t values[3];
 
-xcb_gcontext_t
-create_context(void) {
-	xcb_gcontext_t gc;
-
-	gc = xcb_generate_id(conn);
-	if (!gc) {
-		warnx("could not generate new id");
-		return 0;
-	}
-
-	xcb_create_gc(conn, gc, scr->root, XCB_GC_FOREGROUND, values);
-	return gc;
-}
-
 void
 line(int x0, int y0, int x1, int y1) {
 	xcb_gcontext_t gc;
@@ -30,29 +16,15 @@ line(int x0, int y0, int x1, int y1) {
 	p[1].x = x1;
 	p[1].y = y1;
 
-	gc = create_context();
-	if (gc == 0)
+	gc = xcb_generate_id(conn);
+	if (!gc) {
+		warnx("could not generate new id");
 		return;
+	}
 
 	xcb_create_gc(conn, gc, scr->root, XCB_GC_FOREGROUND, values);
 
 	xcb_poly_line(conn, XCB_COORD_MODE_ORIGIN, scr->root, gc, 2, p);
-	xcb_flush(conn);
-}
-
-void
-dot(int x, int y) {
-	xcb_gcontext_t gc;
-	xcb_point_t p[1];
-
-	p[0].x = x;
-	p[0].y = y;
-
-	gc = create_context();
-	if (gc == 0)
-		return;
-
-	xcb_poly_point(conn, XCB_COORD_MODE_ORIGIN, scr->root, gc, 1, p);
 	xcb_flush(conn);
 }
 
@@ -84,8 +56,6 @@ main(int argc, char **argv) {
 
 		if (y1)
 			line(x0, y0, x1, y1);
-		else if (y0)
-			dot(x0, y0);
 		else
 			/* if input is not valid, quit */
 			break;
