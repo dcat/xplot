@@ -1,9 +1,14 @@
 #include <xcb/xcb.h>
 #include <stdio.h>
 #include <err.h>
+#include "arg.h"
+
+#define BG 0x000000
+#define FG 0xFFFFFF
 
 static xcb_connection_t *conn;
 static xcb_screen_t *scr;
+static xcb_window_t win;
 static uint32_t values[3];
 
 xcb_gcontext_t
@@ -16,7 +21,8 @@ create_context(void) {
 		return 0;
 	}
 
-	xcb_create_gc(conn, gc, scr->root, XCB_GC_FOREGROUND, values);
+	values[0] = FG;
+	xcb_create_gc(conn, gc, win, XCB_GC_FOREGROUND, values);
 	return gc;
 }
 
@@ -34,9 +40,9 @@ line(int x0, int y0, int x1, int y1) {
 	if (gc == 0)
 		return;
 
-	xcb_create_gc(conn, gc, scr->root, XCB_GC_FOREGROUND, values);
+	xcb_create_gc(conn, gc, win, XCB_GC_FOREGROUND, values);
 
-	xcb_poly_line(conn, XCB_COORD_MODE_ORIGIN, scr->root, gc, 2, p);
+	xcb_poly_line(conn, XCB_COORD_MODE_ORIGIN, win, gc, 2, p);
 	xcb_flush(conn);
 }
 
@@ -52,8 +58,29 @@ dot(int x, int y) {
 	if (gc == 0)
 		return;
 
-	xcb_poly_point(conn, XCB_COORD_MODE_ORIGIN, scr->root, gc, 1, p);
+	xcb_poly_point(conn, XCB_COORD_MODE_ORIGIN, win, gc, 1, p);
 	xcb_flush(conn);
+}
+
+xcb_window_t
+create_win() {
+	xcb_window_t wid;
+	uint32_t bg = BG;
+
+	wid = xcb_generate_id(conn);
+
+	xcb_create_window(conn, XCB_COPY_FROM_PARENT, wid, scr->root,
+			0, 0,
+			150, 150,
+			0,
+			XCB_WINDOW_CLASS_INPUT_OUTPUT,
+			scr->root_visual,
+			XCB_CW_BACK_PIXEL, &bg);
+
+	xcb_map_window(conn, wid);
+	xcb_flush(conn);
+
+	return wid;
 }
 
 int
@@ -74,6 +101,14 @@ main(int argc, char **argv) {
 	values[0] = scr->white_pixel;
 	values[1] = 1;
 	values[2] = XCB_SUBWINDOW_MODE_INCLUDE_INFERIORS;
+
+	win = scr->root;
+
+	ARGBEGIN {
+	case 'w':
+		win = create_win();
+		break;
+	} ARGEND
 
 	while (fgets(buf, BUFSIZ, stdin)) {
 		if (buf[0] == '#')
